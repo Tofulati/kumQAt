@@ -22,6 +22,10 @@ async function httpError(r: Response): Promise<Error> {
   return new Error(`${r.status} ${r.statusText}: ${detail}`);
 }
 
+// ---------------------------------------------------------------------------
+// Shared types
+// ---------------------------------------------------------------------------
+
 export type TestCase = {
   id: string;
   name: string;
@@ -34,6 +38,41 @@ export type TestCase = {
   tags: string[];
 };
 
+export type TestResult = {
+  test_case_id: string;
+  status: "pass" | "fail" | "flaky" | "blocked";
+  severity: "low" | "medium" | "high";
+  confidence: number;
+  failed_step: string | null;
+  expected: string;
+  actual: string;
+  repro_steps: string[];
+  evidence: string[];
+  suspected_issue: string;
+  business_impact: string;
+  agent_trace: string;
+  summary: string;
+};
+
+export type SseEvent = {
+  type:
+    | "run_started"
+    | "case_started"
+    | "case_completed"
+    | "run_completed"
+    | "done"
+    | string;
+  data: Record<string, unknown>;
+};
+
+export type ChatMessage = {
+  role: "user" | "agent" | "system";
+  text: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  runId?: string;
+};
+
 export type RunResults = {
   run_id: string;
   url: string;
@@ -41,9 +80,13 @@ export type RunResults = {
   status: string;
   viewport: string;
   created_at: string;
-  results: Record<string, unknown>[];
+  results: TestResult[];
   test_cases: TestCase[];
 };
+
+// ---------------------------------------------------------------------------
+// API helpers
+// ---------------------------------------------------------------------------
 
 export async function generateTests(body: {
   url: string;
@@ -106,4 +149,78 @@ export async function rerunFailed(runId: string): Promise<{ run_id: string; mess
 export function fileUrl(path: string): string {
   if (path.startsWith("http")) return path;
   return `${getApiBase()}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+// ---------------------------------------------------------------------------
+// SSE helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Subscribe to live events for a run via EventSource (GET /stream/{runId}).
+ * Returns a cleanup function — call it from useEffect's return.
+ */
+export function streamRunEvents(
+  runId: string,
+  onEvent: (e: SseEvent) => void,
+  onClose: () => void,
+): () => void {
+  const source = new EventSource(`/api/qa/stream/${runId}`);
+  source.onmessage = (e) => {
+    try {
+      const event = JSON.parse(e.data as string) as SseEvent;
+      onEvent(event);
+      if (event.type === "done") {
+        onClose();
+        source.close();
+      }
+    } catch {
+      /* ignore malformed frames */
+    }
+  };
+  source.onerror = () => {
+    onClose();
+    source.close();
+  };
+  return () => source.close();
+}
+
+/**
+ * Parse raw SSE text chunks (possibly containing multiple events) into SseEvent[].
+ * Used when consuming a POST streaming response with fetch + ReadableStream.
+ */
+export function parseSseChunk(chunk: string): SseEvent[] {
+  const events: SseEvent[] = [];
+  for (const block of chunk.split("\n\n")) {
+    for (const line of block.split("\n")) {
+      if (line.startsWith("data:")) {
+        const raw = line.slice(5).trim();
+        if (!raw) continue;
+        try {
+          events.push(JSON.parse(raw) as SseEvent);
+        } catch {
+          /* skip */
+        }
+      }
+    }
+  }
+  return events;
+}
+
+/**
+ * Start a /chat-run POST and return a streaming body + abort controller.
+ * The caller must read response.body with a ReadableStream reader.
+ */
+export function chatRun(body: {
+  url: string;
+  requirement_text: string;
+  viewport: "desktop" | "mobile";
+}): { bodyPromise: Promise<ReadableStream<Uint8Array> | null>; controller: AbortController } {
+  const controller = new AbortController();
+  const bodyPromise = fetch("/api/qa/chat-run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: controller.signal,
+  }).then((r) => r.body);
+  return { bodyPromise, controller };
 }
