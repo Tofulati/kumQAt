@@ -8,6 +8,7 @@ from database import engine
 from models.db_models import Run, StoredTestCase, TestResultRow
 from models.schemas import TestCase, TestResultPayload
 from services.browser_runner import execute_case
+from services.event_bus import close_queue, emit
 from services.planner import generate_test_cases
 from services.reporter import attach_evidence, build_summary
 from services.validator import validate_result
@@ -33,8 +34,17 @@ async def execute_run(run_id: str) -> None:
         ).all()
         base = run_dir(run_id)
 
-        for row in cases_rows:
+        await emit(run_id, "run_started", {"run_id": run_id, "total": len(cases_rows)})
+
+        for i, row in enumerate(cases_rows):
             case = TestCase.model_validate_json(row.case_json)
+
+            await emit(run_id, "case_started", {
+                "case_id": case.id,
+                "name": case.name,
+                "index": i,
+            })
+
             try:
                 trace, title, final_url, evidence_paths, http_ok = await execute_case(
                     case,
@@ -70,8 +80,24 @@ async def execute_run(run_id: str) -> None:
                     agent_trace=trace,
                 )
                 validated.summary = build_summary(validated)
+
+                await emit(run_id, "case_completed", {
+                    "case_id": case.id,
+                    "status": validated.status,
+                    "severity": validated.severity,
+                    "summary": validated.summary,
+                    "evidence": validated.evidence,
+                })
             else:
                 validated.summary = build_summary(validated)
+
+                await emit(run_id, "case_completed", {
+                    "case_id": case.id,
+                    "status": validated.status,
+                    "severity": validated.severity,
+                    "summary": validated.summary,
+                    "evidence": validated.evidence,
+                })
 
             res = TestResultRow(
                 id=str(uuid.uuid4()),
@@ -87,6 +113,9 @@ async def execute_run(run_id: str) -> None:
             run.status = "completed"
             session.add(run)
             session.commit()
+
+        await emit(run_id, "run_completed", {"run_id": run_id, "status": "completed"})
+        close_queue(run_id)
 
 
 async def ensure_cases_for_run(
