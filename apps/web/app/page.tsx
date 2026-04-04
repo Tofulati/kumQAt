@@ -82,6 +82,13 @@ export default function Home() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="mx-auto max-w-4xl px-4 py-10">
         <header className="mb-10">
+          <div className="flex items-center gap-4 mb-4 text-sm">
+            <span className="font-semibold text-white">QABot</span>
+            <span className="text-zinc-400">Runs</span>
+            <a href="/chat" className="text-violet-400 hover:underline">
+              💬 Chat interface
+            </a>
+          </div>
           <p className="text-xs uppercase tracking-[0.2em] text-violet-400">
             DiamondHacks · AI QA Engineer
           </p>
