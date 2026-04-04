@@ -121,7 +121,17 @@ The UI polls every 2.5s. There's no live view of what the browser agent is doing
 
 ---
 
-## 4. Battle Plan — What to Build to Win
+## 4. What Has Been Built (PR 1 + PR 2 ✅)
+
+- **Browser Use fixed** — `langchain_openai.ChatOpenAI` + single `OPENAI_API_KEY`
+- **Playwright video recording** — `.webm` per test case, served via `/files/`
+- **SSE event bus** — `services/event_bus.py`, `asyncio.Queue` per run
+- **Orchestrator emits** — `run_started`, `case_started`, `case_completed`, `run_completed`
+- **`GET /stream/{run_id}`** — live SSE stream for any run
+- **`POST /chat-run`** — single-case run that streams events in the response body
+- **Next.js proxy** — forwards `cache-control` + `x-accel-buffering` for SSE
+
+## 5. Battle Plan — What to Build to Win (remaining)
 
 ### Prize Stack We're Targeting
 

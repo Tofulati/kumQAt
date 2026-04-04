@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 function backendBase(): string {
   return (process.env.QA_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
@@ -32,8 +33,13 @@ async function forward(req: NextRequest, segments: string[]) {
     status: res.status,
     statusText: res.statusText,
   });
-  const outCt = res.headers.get("content-type");
-  if (outCt) out.headers.set("content-type", outCt);
+
+  // Forward headers needed for SSE and general correctness
+  for (const key of ["content-type", "cache-control", "x-accel-buffering"]) {
+    const val = res.headers.get(key);
+    if (val) out.headers.set(key, val);
+  }
+
   return out;
 }
 

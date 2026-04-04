@@ -1,14 +1,16 @@
+import asyncio
 import json
 import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlmodel import Session, select
 
 from database import get_session
 from models.db_models import Run, StoredTestCase, TestResultRow
 from models.schemas import (
+    ChatRunRequest,
     RerunFailedRequest,
     RunOneCaseRequest,
     RunResultsResponse,
@@ -16,6 +18,7 @@ from models.schemas import (
     RunSuiteResponse,
     TestCase,
 )
+from services.event_bus import close_queue, create_queue
 from services.orchestrator import (
     ensure_cases_for_run,
     execute_run,
@@ -26,6 +29,40 @@ from services.orchestrator import (
 
 router = APIRouter(tags=["runs"])
 
+
+# ---------------------------------------------------------------------------
+# SSE helpers
+# ---------------------------------------------------------------------------
+
+async def _sse_generator(run_id: str):
+    """Async generator that drains the run's event queue as SSE lines."""
+    queue = create_queue(run_id)
+    try:
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=15.0)
+            except asyncio.TimeoutError:
+                # keepalive comment so the connection doesn't time out
+                yield ": ping\n\n"
+                continue
+            if event is None:
+                # sentinel — run is done
+                yield 'data: {"type":"done"}\n\n'
+                return
+            yield f"data: {json.dumps(event)}\n\n"
+    finally:
+        close_queue(run_id)
+
+
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+}
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
 
 @router.get("/runs")
 def get_runs(limit: int = 20, session: Session = Depends(get_session)):
@@ -57,10 +94,12 @@ async def run_suite(
         body.max_cases,
         body.test_cases,
     )
+    # Pre-create queue so /stream/{run_id} can subscribe before the task starts
+    create_queue(run_id)
     background_tasks.add_task(execute_run, run_id)
     return RunSuiteResponse(
         run_id=run_id,
-        message="Run queued. Poll GET /results/{run_id} for progress.",
+        message="Run queued. Poll GET /results/{run_id} or stream GET /stream/{run_id}.",
     )
 
 
@@ -89,8 +128,65 @@ async def run_single_test(
     )
     session.add(st)
     session.commit()
+    create_queue(run_id)
     background_tasks.add_task(execute_run, run_id)
     return {"run_id": run_id, "message": "Queued single test case."}
+
+
+@router.get("/stream/{run_id}")
+async def stream_run(run_id: str, session: Session = Depends(get_session)):
+    """Server-Sent Events stream for a run's live progress."""
+    run = session.get(Run, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return StreamingResponse(
+        _sse_generator(run_id),
+        media_type="text/event-stream",
+        headers=_SSE_HEADERS,
+    )
+
+
+@router.post("/chat-run")
+async def chat_run(
+    body: ChatRunRequest,
+    session: Session = Depends(get_session),
+):
+    """
+    Starts a single-case run and streams its events as SSE in the response body.
+
+    Uses asyncio.create_task (not BackgroundTasks) so the coroutine runs on the
+    event loop while the StreamingResponse generator is still open.
+    """
+    run_id = str(uuid.uuid4())
+    run = Run(
+        id=run_id,
+        url=body.url,
+        requirement_text=body.requirement_text,
+        status="pending",
+        viewport=body.viewport,
+        created_at=datetime.utcnow(),
+    )
+    session.add(run)
+    session.commit()
+
+    await ensure_cases_for_run(
+        session,
+        run_id,
+        body.url,
+        body.requirement_text,
+        max_cases=1,
+        provided=None,
+    )
+
+    # Queue must exist before the task starts to avoid lost events
+    create_queue(run_id)
+    asyncio.create_task(execute_run(run_id))
+
+    return StreamingResponse(
+        _sse_generator(run_id),
+        media_type="text/event-stream",
+        headers=_SSE_HEADERS,
+    )
 
 
 @router.get("/results/{run_id}", response_model=RunResultsResponse)
@@ -160,6 +256,7 @@ async def rerun_failed(
         )
         session.add(st)
     session.commit()
+    create_queue(run_id)
     background_tasks.add_task(execute_run, run_id)
     return {"run_id": run_id, "message": f"Rerunning {len(cases)} case(s)."}
 

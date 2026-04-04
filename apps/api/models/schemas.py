@@ -80,3 +80,9 @@ class RunOneCaseRequest(BaseModel):
     test_case: TestCase
     viewport: Literal["desktop", "mobile"] = "desktop"
     requirement_text: str = ""
+
+
+class ChatRunRequest(BaseModel):
+    url: str
+    requirement_text: str
+    viewport: Literal["desktop", "mobile"] = "desktop"
