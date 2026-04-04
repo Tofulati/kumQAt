@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import type { TestResult } from "@/lib/api";
 
 type Props = {
@@ -22,7 +23,6 @@ export default function SummaryBar({ results, status, total }: Props) {
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-      {/* Stat pills */}
       <div className="flex flex-wrap gap-3">
         <Pill count={counts.pass ?? 0} label="Passed" color="emerald" />
         <Pill count={counts.fail ?? 0} label="Failed" color="red" />
@@ -31,16 +31,16 @@ export default function SummaryBar({ results, status, total }: Props) {
 
         {done && (
           <span className="ml-auto flex items-center gap-1.5 text-sm text-emerald-400">
-            <span>✓</span> Run complete
+            <Check size={14} />
+            Run complete
           </span>
         )}
       </div>
 
-      {/* Progress bar — only shown while running */}
       {!done && (
         <div className="mt-4">
-          <div className="flex justify-between text-xs text-zinc-500 mb-1">
-            <span>Running…</span>
+          <div className="mb-1 flex justify-between text-xs text-zinc-500">
+            <span>Running</span>
             <span>
               {results.length} / {total || "?"} cases
             </span>
@@ -73,9 +73,7 @@ function Pill({
     sky: "bg-sky-950 text-sky-300 border-sky-800",
   };
   return (
-    <span
-      className={`rounded-full border px-3 py-0.5 text-sm font-medium ${styles[color]}`}
-    >
+    <span className={`rounded-full border px-3 py-0.5 text-sm font-medium ${styles[color]}`}>
       {count} {label}
     </span>
   );

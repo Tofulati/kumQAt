@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
 import { fileUrl, type TestCase, type TestResult } from "@/lib/api";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -12,7 +13,7 @@ const STATUS_STYLES: Record<string, string> = {
 const STATUS_DESCRIPTIONS: Record<string, string> = {
   pass: "All expected outcomes were met",
   fail: "One or more expected outcomes were not met",
-  blocked: "Could not run — auth, CAPTCHA, or bot protection prevented access",
+  blocked: "Could not run: auth, CAPTCHA, or bot protection prevented access",
   flaky: "Result was inconsistent across attempts",
 };
 
@@ -32,7 +33,7 @@ function Badge({ label, style, title }: { label: string; style: string; title?: 
   return (
     <span
       title={title}
-      className={`rounded-full border px-2 py-0.5 text-xs font-medium cursor-help ${style}`}
+      className={`cursor-help rounded-full border px-2 py-0.5 text-xs font-medium ${style}`}
     >
       {label}
     </span>
@@ -57,8 +58,8 @@ export default function ResultCard({ result, testCase }: Props) {
   const isProblem = result.status !== "pass";
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 shadow-sm">
-      {/* ── Header ── */}
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+      {/* Header */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold text-white">{name}</span>
         <Badge
@@ -76,7 +77,7 @@ export default function ResultCard({ result, testCase }: Props) {
         </span>
       </div>
 
-      {/* ── Test goal ── */}
+      {/* Test goal */}
       {testCase?.goal && (
         <p className="mt-2 text-xs text-zinc-500">
           <span className="font-semibold uppercase tracking-wide text-zinc-600">Goal: </span>
@@ -84,48 +85,55 @@ export default function ResultCard({ result, testCase }: Props) {
         </p>
       )}
 
-      {/* ── What was tested (steps summary) ── */}
+      {/* Steps tested */}
       {testCase?.steps && testCase.steps.length > 0 && (
         <div className="mt-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 mb-1">Steps tested</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-600">
+            Steps tested
+          </p>
           <ol className="list-decimal list-inside space-y-0.5">
             {testCase.steps.slice(0, 4).map((s, i) => (
-              <li key={i} className="text-xs text-zinc-400">{s}</li>
+              <li key={i} className="text-xs text-zinc-400">
+                {s}
+              </li>
             ))}
             {testCase.steps.length > 4 && (
-              <li className="text-xs text-zinc-600">+{testCase.steps.length - 4} more…</li>
+              <li className="text-xs text-zinc-600">+{testCase.steps.length - 4} more</li>
             )}
           </ol>
         </div>
       )}
 
-      {/* ── Expected vs Actual — always visible ── */}
+      {/* Expected vs Actual */}
       {(result.expected || result.actual) && (
-        <div className="mt-3 grid grid-cols-2 gap-3 text-xs rounded-lg bg-zinc-950/50 p-3">
+        <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-zinc-950/50 p-3 text-xs">
           {result.expected && (
             <div>
-              <p className="font-semibold uppercase tracking-wide text-zinc-500 mb-0.5">Expected</p>
+              <p className="mb-0.5 font-semibold uppercase tracking-wide text-zinc-500">Expected</p>
               <p className="text-zinc-300">{result.expected}</p>
             </div>
           )}
           {result.actual && (
             <div>
-              <p className="font-semibold uppercase tracking-wide text-zinc-500 mb-0.5">Actual</p>
+              <p className="mb-0.5 font-semibold uppercase tracking-wide text-zinc-500">Actual</p>
               <p className={isProblem ? "text-red-300" : "text-zinc-300"}>{result.actual}</p>
             </div>
           )}
         </div>
       )}
 
-      {/* ── Suspected issue callout — always visible when present ── */}
+      {/* Suspected issue */}
       {result.suspected_issue && (
-        <div className="mt-3 rounded-lg border border-amber-900/60 bg-amber-950/30 px-3 py-2">
-          <p className="text-xs font-semibold text-amber-400 mb-0.5">⚠ Suspected issue</p>
-          <p className="text-sm text-amber-200">{result.suspected_issue}</p>
+        <div className="mt-3 flex gap-2 rounded-lg border border-amber-900/60 bg-amber-950/30 px-3 py-2">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-400" />
+          <div>
+            <p className="text-xs font-semibold text-amber-400">Suspected issue</p>
+            <p className="mt-0.5 text-sm text-amber-200">{result.suspected_issue}</p>
+          </div>
         </div>
       )}
 
-      {/* ── Business impact ── */}
+      {/* Business impact */}
       {result.business_impact && (
         <p className="mt-2 text-xs text-zinc-500">
           <span className="font-semibold text-zinc-600">Impact: </span>
@@ -133,9 +141,9 @@ export default function ResultCard({ result, testCase }: Props) {
         </p>
       )}
 
-      {/* ── Screenshots always visible ── */}
+      {/* Screenshots */}
       {pngEvidence.length > 0 && (
-        <div className="mt-3">
+        <div className="mt-3 space-y-2">
           {pngEvidence.map((p) => (
             <img
               key={p}
@@ -148,9 +156,9 @@ export default function ResultCard({ result, testCase }: Props) {
         </div>
       )}
 
-      {/* ── Video recordings always visible ── */}
+      {/* Video recordings */}
       {videoEvidence.length > 0 && (
-        <div className="mt-3">
+        <div className="mt-3 space-y-2">
           {videoEvidence.map((v) => (
             <video key={v} controls className="w-full rounded-lg border border-zinc-700">
               <source src={fileUrl(v)} type="video/webm" />
@@ -159,11 +167,11 @@ export default function ResultCard({ result, testCase }: Props) {
         </div>
       )}
 
-      {/* ── Expandable: repro steps + agent trace ── */}
+      {/* Repro steps + agent trace (collapsed) */}
       {(reproSteps.length > 0 || result.agent_trace) && (
-        <details className="mt-3 group">
-          <summary className="cursor-pointer text-xs text-violet-400 hover:text-violet-300 select-none">
-            Repro steps &amp; agent trace ▾
+        <details className="mt-3">
+          <summary className="cursor-pointer select-none text-xs text-violet-400 hover:text-violet-300">
+            Repro steps and agent trace
           </summary>
 
           <div className="mt-3 space-y-3">
@@ -174,7 +182,9 @@ export default function ResultCard({ result, testCase }: Props) {
                 </p>
                 <ol className="list-decimal list-inside space-y-1">
                   {reproSteps.map((s, i) => (
-                    <li key={i} className="text-sm text-zinc-400">{s}</li>
+                    <li key={i} className="text-sm text-zinc-400">
+                      {s}
+                    </li>
                   ))}
                 </ol>
               </div>
@@ -185,7 +195,7 @@ export default function ResultCard({ result, testCase }: Props) {
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">
                   Agent trace
                 </p>
-                <pre className="whitespace-pre-wrap rounded-lg bg-zinc-950 p-3 text-xs text-zinc-500 overflow-x-auto max-h-64 overflow-y-auto">
+                <pre className="max-h-64 overflow-x-auto overflow-y-auto whitespace-pre-wrap rounded-lg bg-zinc-950 p-3 text-xs text-zinc-500">
                   {result.agent_trace}
                 </pre>
               </div>

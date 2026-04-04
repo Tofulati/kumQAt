@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, MessageSquare, RotateCcw, ExternalLink } from "lucide-react";
 import {
-  fileUrl,
   getApiBase,
   getResults,
   rerunFailed,
@@ -17,10 +17,10 @@ import ResultCard from "./ResultCard";
 import SummaryBar from "./SummaryBar";
 
 const STATUS_LEGEND = [
-  { label: "pass", color: "bg-emerald-950 text-emerald-300", icon: "✅" },
-  { label: "fail", color: "bg-red-950 text-red-300", icon: "❌" },
-  { label: "blocked", color: "bg-amber-950 text-amber-200", icon: "⚠️" },
-  { label: "flaky", color: "bg-sky-950 text-sky-300", icon: "🔄" },
+  { label: "pass", color: "bg-emerald-950 text-emerald-300 border border-emerald-800" },
+  { label: "fail", color: "bg-red-950 text-red-300 border border-red-800" },
+  { label: "blocked", color: "bg-amber-950 text-amber-200 border border-amber-800" },
+  { label: "flaky", color: "bg-sky-950 text-sky-300 border border-sky-800" },
 ];
 
 export default function RunPage() {
@@ -35,7 +35,6 @@ export default function RunPage() {
   const [rerunBusy, setRerunBusy] = useState(false);
   const didFetch = useRef(false);
 
-  // Initial fetch — populates data for already-completed runs
   useEffect(() => {
     if (didFetch.current) return;
     didFetch.current = true;
@@ -46,7 +45,6 @@ export default function RunPage() {
       );
   }, [runId]);
 
-  // SSE subscription — accumulates live results as the run progresses
   useEffect(() => {
     const handler = (event: SseEvent) => {
       if (event.type === "run_started") {
@@ -71,10 +69,9 @@ export default function RunPage() {
         setLiveResults((prev) => [...prev, partial]);
       } else if (event.type === "run_completed") {
         setStreamDone(true);
-        // Re-fetch final DB state to get complete result payloads
         getResults(runId)
           .then((r) => setData(r))
-          .catch(() => {/* data already partially loaded */});
+          .catch(() => {});
       }
     };
     const cleanup = streamRunEvents(runId, handler, () => setStreamDone(true));
@@ -93,14 +90,9 @@ export default function RunPage() {
     }
   };
 
-  // Decide which results to display:
-  // - Use DB results once stream is done or run was already completed on load
-  // - Fall back to live SSE accumulation while running
   const isCompleted = streamDone || data?.status === "completed";
   const displayResults: TestResult[] =
-    isCompleted && data?.results?.length
-      ? data.results
-      : liveResults;
+    isCompleted && data?.results?.length ? data.results : liveResults;
 
   const caseMap = new Map(
     (data?.test_cases ?? []).map((c) => [c.id, c]),
@@ -112,7 +104,7 @@ export default function RunPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="mx-auto max-w-5xl px-4 py-10">
         <h1 className="text-2xl font-semibold text-white">
-          Run <span className="font-mono text-violet-400">{runId.slice(0, 8)}…</span>
+          Run <span className="font-mono text-violet-400">{runId.slice(0, 8)}</span>
         </h1>
 
         {err && (
@@ -122,7 +114,7 @@ export default function RunPage() {
         )}
 
         {!data && !err && (
-          <p className="mt-6 text-zinc-500 animate-pulse">Connecting…</p>
+          <p className="mt-6 animate-pulse text-zinc-500">Connecting...</p>
         )}
 
         {(data || liveResults.length > 0) && (
@@ -133,7 +125,7 @@ export default function RunPage() {
                 className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                   isCompleted
                     ? "bg-emerald-950 text-emerald-300"
-                    : "bg-amber-950 text-amber-200 animate-pulse"
+                    : "animate-pulse bg-amber-950 text-amber-200"
                 }`}
               >
                 {runStatus}
@@ -141,7 +133,7 @@ export default function RunPage() {
               <span>{data?.viewport ?? "desktop"}</span>
               {data?.url && (
                 <a
-                  className="font-mono text-violet-400 hover:underline truncate max-w-xs"
+                  className="max-w-xs truncate font-mono text-violet-400 hover:underline"
                   href={data.url}
                   target="_blank"
                   rel="noreferrer"
@@ -151,38 +143,34 @@ export default function RunPage() {
               )}
               {data && (
                 <a
-                  className="ml-auto text-zinc-500 hover:text-zinc-300 text-xs"
+                  className="ml-auto flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300"
                   href={`${getApiBase()}/export/${data.run_id}.json`}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Export JSON ↗
+                  Export JSON
+                  <ExternalLink size={12} />
                 </a>
               )}
             </div>
 
             {data?.requirement_text && (
-              <p className="text-sm text-zinc-300 italic">&ldquo;{data.requirement_text}&rdquo;</p>
+              <p className="text-sm italic text-zinc-300">
+                &ldquo;{data.requirement_text}&rdquo;
+              </p>
             )}
 
-            {/* Summary bar */}
-            <SummaryBar
-              results={displayResults}
-              status={runStatus}
-              total={total}
-            />
+            <SummaryBar results={displayResults} status={runStatus} total={total} />
 
             {/* Status legend */}
-            <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-              <span className="font-semibold uppercase tracking-wide mr-1">Legend:</span>
-              {STATUS_LEGEND.map(({ label, color, icon }) => (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-semibold uppercase tracking-wide text-zinc-600">Legend:</span>
+              {STATUS_LEGEND.map(({ label, color }) => (
                 <span
                   key={label}
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${color}`}
-                  title={label}
+                  className={`rounded-full px-2 py-0.5 ${color}`}
                 >
-                  <span>{icon}</span>
-                  <span>{label}</span>
+                  {label}
                 </span>
               ))}
             </div>
@@ -194,21 +182,24 @@ export default function RunPage() {
                   type="button"
                   disabled={rerunBusy}
                   onClick={() => void onRerun()}
-                  className="rounded-lg border border-zinc-600 bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
+                  <RotateCcw size={14} />
                   Re-run failed / flaky / blocked
                 </button>
                 <Link
                   href={`/chat?from_run=${runId}`}
-                  className="rounded-lg border border-violet-700 bg-violet-950/40 px-3 py-1.5 text-sm text-violet-300 hover:bg-violet-900/40"
+                  className="flex items-center gap-1.5 rounded-lg border border-violet-700 bg-violet-950/40 px-3 py-1.5 text-sm text-violet-300 hover:bg-violet-900/40"
                 >
-                  💬 Chat about this run →
+                  <MessageSquare size={14} />
+                  Chat about this run
                 </Link>
                 <Link
                   href="/"
-                  className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
+                  className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
                 >
-                  ← New run
+                  <ArrowLeft size={14} />
+                  New run
                 </Link>
               </div>
             )}
@@ -226,8 +217,8 @@ export default function RunPage() {
               </div>
             ) : (
               !isCompleted && (
-                <p className="text-sm text-zinc-500 animate-pulse">
-                  Waiting for first test case to complete…
+                <p className="animate-pulse text-sm text-zinc-500">
+                  Waiting for first test case to complete...
                 </p>
               )
             )}
