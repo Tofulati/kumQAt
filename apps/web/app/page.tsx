@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronDown, TriangleAlert, X } from "lucide-react";
 import {
   generateTests,
   listRuns,
@@ -82,6 +82,7 @@ export default function Home() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRunModal, setShowRunModal] = useState(false);
   const [recent, setRecent] = useState<
     { run_id: string; url: string; status: string; created_at: string }[]
   >([]);
@@ -226,7 +227,7 @@ export default function Home() {
             <button
               type="button"
               disabled={loading}
-              onClick={() => void onRun()}
+              onClick={() => setShowRunModal(true)}
               className="rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
             >
               Run suite
@@ -355,6 +356,119 @@ export default function Home() {
             ))}
           </div>
         </section>
+      </div>
+
+      {showRunModal && (
+        <RunModal
+          onConfirm={() => {
+            setShowRunModal(false);
+            void onRun();
+          }}
+          onCancel={() => setShowRunModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Confirmation modal
+// ---------------------------------------------------------------------------
+
+function RunModal({
+  onConfirm,
+  onCancel,
+}: {
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const [typed, setTyped] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const confirmed = typed === "run suite";
+
+  // Focus the input and allow Escape to cancel
+  useEffect(() => {
+    inputRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl">
+        {/* Header */}
+        <div className="flex items-start justify-between border-b border-zinc-800 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-950 text-amber-400">
+              <TriangleAlert size={16} />
+            </div>
+            <h2 className="text-base font-semibold text-white">Confirm Run Suite</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="ml-4 rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-4">
+          <p className="text-sm text-zinc-300">
+            Please type{" "}
+            <code className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-violet-300">
+              run suite
+            </code>{" "}
+            to confirm that you want to launch a full browser test run against the target URL.
+          </p>
+          <p className="text-sm text-zinc-500">
+            This action will open a real browser, execute each test case using the Browser Use
+            Cloud agent, and may consume API credits. Depending on the number of cases, the
+            run may take several minutes to complete.
+          </p>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5" htmlFor="confirm-input">
+              Type to confirm
+            </label>
+            <input
+              id="confirm-input"
+              ref={inputRef}
+              type="text"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && confirmed) onConfirm(); }}
+              placeholder="run suite"
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-white outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 border-t border-zinc-800 px-6 py-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!confirmed}
+            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Confirm run
+          </button>
+        </div>
       </div>
     </div>
   );
