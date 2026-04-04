@@ -1,0 +1,14 @@
+{
+  "name": "diamond-hacks",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=web",
+    "dev:web": "npm run dev --workspace=web",
+    "dev:api": "cd apps/api && .venv/bin/uvicorn main:app --reload --host 127.0.0.1 --port 8000",
+    "build": "npm run build --workspace=web",
+    "lint": "npm run lint --workspace=web"
+  }
+}
