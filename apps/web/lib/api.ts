@@ -207,6 +207,24 @@ export function parseSseChunk(chunk: string): SseEvent[] {
 }
 
 /**
+ * Ask a question about an existing completed/in-progress run.
+ * No new browser execution — pure Gemini Q&A over collected results.
+ */
+export async function discussRun(
+  runId: string,
+  messages: { role: "user" | "assistant"; content: string }[],
+): Promise<string> {
+  const r = await fetch(`${getApiBase()}/discuss`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ run_id: runId, messages }),
+  });
+  if (!r.ok) throw await httpError(r);
+  const data = (await r.json()) as { reply: string };
+  return data.reply;
+}
+
+/**
  * Start a /chat-run POST and return a streaming body + abort controller.
  * The caller must read response.body with a ReadableStream reader.
  */

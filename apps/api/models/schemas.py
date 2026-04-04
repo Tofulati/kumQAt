@@ -86,3 +86,13 @@ class ChatRunRequest(BaseModel):
     url: str
     requirement_text: str
     viewport: Literal["desktop", "mobile"] = "desktop"
+
+
+class DiscussMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class DiscussRequest(BaseModel):
+    run_id: str
+    messages: list[DiscussMessage]

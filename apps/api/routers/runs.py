@@ -11,6 +11,7 @@ from database import get_session
 from models.db_models import Run, StoredTestCase, TestResultRow
 from models.schemas import (
     ChatRunRequest,
+    DiscussRequest,
     RerunFailedRequest,
     RunOneCaseRequest,
     RunResultsResponse,
@@ -275,6 +276,83 @@ async def rerun_failed(
     create_queue(run_id)
     background_tasks.add_task(execute_run, run_id)
     return {"run_id": run_id, "message": f"Rerunning {len(cases)} case(s)."}
+
+
+@router.post("/discuss")
+async def discuss_run(body: DiscussRequest, session: Session = Depends(get_session)):
+    """
+    Answer a question about an existing run's results using Gemini.
+    No browser execution — pure Q&A over already-collected test data.
+    """
+    import os
+
+    data = serialize_run_results(session, body.run_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    key = (os.getenv("GOOGLE_API_KEY") or "").strip()
+    if not key:
+        raise HTTPException(status_code=503, detail="GOOGLE_API_KEY not configured")
+
+    # Truncate heavy agent traces so we stay within context limits
+    results_trimmed = []
+    for r in data.get("results", []):
+        r2 = dict(r)
+        r2["agent_trace"] = (r2.get("agent_trace") or "")[:800]
+        results_trimmed.append(r2)
+
+    context_blob = json.dumps(
+        {
+            "run_id": data["run_id"],
+            "url": data["url"],
+            "requirement_text": data["requirement_text"],
+            "status": data["status"],
+            "test_cases": data.get("test_cases", []),
+            "results": results_trimmed,
+        },
+        indent=2,
+        ensure_ascii=False,
+    )[:16000]
+
+    system_prompt = (
+        "You are a senior QA engineer reviewing automated browser test results. "
+        "You have full access to the test run data below, including each test case's "
+        "steps, expected outcomes, actual results, suspected issues, and agent traces. "
+        "Answer the developer's questions concisely and actionably. "
+        "Reference specific test case names and results. "
+        "If asked to suggest fixes, be concrete. "
+        "Do NOT re-run or re-execute anything — only analyse what is already in the data.\n\n"
+        f"=== TEST RUN DATA ===\n{context_blob}"
+    )
+
+    # Build conversation turns
+    turns: list[str] = []
+    for msg in body.messages[:-1]:
+        prefix = "Developer" if msg.role == "user" else "QA Assistant"
+        turns.append(f"{prefix}: {msg.content}")
+    last_question = body.messages[-1].content if body.messages else "Summarise the results."
+
+    contents = "\n".join(turns) + f"\nDeveloper: {last_question}" if turns else f"Developer: {last_question}"
+
+    try:
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(api_key=key)
+        model = os.getenv("GEMINI_DISCUSS_MODEL", "gemini-2.0-flash")
+        resp = client.models.generate_content(
+            model=model,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.4,
+            ),
+        )
+        reply = (resp.text or "").strip()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Gemini error: {e!s}") from e
+
+    return {"reply": reply}
 
 
 @router.get("/export/{run_id}.json")
