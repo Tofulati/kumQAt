@@ -80,6 +80,128 @@ _SSE_HEADERS = {
 # Routes
 # ---------------------------------------------------------------------------
 
+@router.get("/stats")
+def get_stats(session: Session = Depends(get_session)):
+    """Aggregate quality metrics across all runs for the dashboard."""
+    import statistics as _stats
+    from urllib.parse import urlparse
+
+    runs = session.exec(select(Run)).all()
+    result_rows = session.exec(select(TestResultRow)).all()
+
+    # Parse every result payload
+    parsed: list[dict] = []
+    for rr in result_rows:
+        try:
+            payload = json.loads(rr.result_json)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        parsed.append(
+            {
+                "run_id": rr.run_id,
+                "status": payload.get("status", "fail"),
+                "severity": payload.get("severity", "medium"),
+                "confidence": float(payload.get("confidence", 0.5)),
+            }
+        )
+
+    # Overall status counts
+    overall: dict[str, int] = {"pass": 0, "fail": 0, "blocked": 0, "flaky": 0}
+    for p in parsed:
+        if p["status"] in overall:
+            overall[p["status"]] += 1
+
+    # Severity counts
+    by_severity: dict[str, int] = {"high": 0, "medium": 0, "low": 0}
+    for p in parsed:
+        if p["severity"] in by_severity:
+            by_severity[p["severity"]] += 1
+
+    # Aggregate by domain
+    run_map = {r.id: r for r in runs}
+    domain_agg: dict[str, dict] = {}
+    for p in parsed:
+        run = run_map.get(p["run_id"])
+        if not run:
+            continue
+        try:
+            domain = urlparse(run.url).netloc or run.url
+        except Exception:
+            domain = run.url
+        if domain not in domain_agg:
+            domain_agg[domain] = {
+                "domain": domain,
+                "run_ids": set(),
+                "pass": 0,
+                "fail": 0,
+                "blocked": 0,
+                "flaky": 0,
+                "confidences": [],
+            }
+        domain_agg[domain]["run_ids"].add(p["run_id"])
+        if p["status"] in domain_agg[domain]:
+            domain_agg[domain][p["status"]] += 1
+        domain_agg[domain]["confidences"].append(p["confidence"])
+
+    by_domain = []
+    for data in sorted(
+        domain_agg.values(),
+        key=lambda d: sum(d[s] for s in ("pass", "fail", "blocked", "flaky")),
+        reverse=True,
+    ):
+        total_cases = sum(data[s] for s in ("pass", "fail", "blocked", "flaky"))
+        by_domain.append(
+            {
+                "domain": data["domain"],
+                "runs": len(data["run_ids"]),
+                "pass": data["pass"],
+                "fail": data["fail"],
+                "blocked": data["blocked"],
+                "flaky": data["flaky"],
+                "total": total_cases,
+                "pass_rate": round(data["pass"] / total_cases, 3) if total_cases else 0,
+                "avg_confidence": round(
+                    _stats.mean(data["confidences"]) if data["confidences"] else 0, 3
+                ),
+            }
+        )
+
+    # Recent runs (up to 10) with per-run result summaries
+    results_by_run: dict[str, dict[str, int]] = {}
+    for p in parsed:
+        if p["run_id"] not in results_by_run:
+            results_by_run[p["run_id"]] = {"pass": 0, "fail": 0, "blocked": 0, "flaky": 0}
+        if p["status"] in results_by_run[p["run_id"]]:
+            results_by_run[p["run_id"]][p["status"]] += 1
+
+    recent_runs = []
+    for run in sorted(runs, key=lambda r: (r.created_at or ""), reverse=True)[:10]:
+        counts = results_by_run.get(run.id, {"pass": 0, "fail": 0, "blocked": 0, "flaky": 0})
+        try:
+            domain = urlparse(run.url).netloc or run.url
+        except Exception:
+            domain = run.url
+        recent_runs.append(
+            {
+                "run_id": run.id,
+                "domain": domain,
+                "url": run.url,
+                "status": run.status,
+                "created_at": run.created_at.isoformat() if run.created_at else "",
+                **counts,
+            }
+        )
+
+    return {
+        "total_runs": len(runs),
+        "total_cases": len(parsed),
+        "overall": overall,
+        "by_severity": by_severity,
+        "by_domain": by_domain,
+        "recent_runs": recent_runs,
+    }
+
+
 @router.get("/config-status")
 def config_status():
     """Return which optional API keys are configured (values never exposed)."""

@@ -136,6 +136,49 @@ export async function listRuns(): Promise<
   return r.json();
 }
 
+// ---------------------------------------------------------------------------
+// Dashboard stats
+// ---------------------------------------------------------------------------
+
+export type DomainStat = {
+  domain: string;
+  runs: number;
+  pass: number;
+  fail: number;
+  blocked: number;
+  flaky: number;
+  total: number;
+  pass_rate: number;
+  avg_confidence: number;
+};
+
+export type RecentRun = {
+  run_id: string;
+  domain: string;
+  url: string;
+  status: string;
+  created_at: string;
+  pass: number;
+  fail: number;
+  blocked: number;
+  flaky: number;
+};
+
+export type StatsData = {
+  total_runs: number;
+  total_cases: number;
+  overall: { pass: number; fail: number; blocked: number; flaky: number };
+  by_severity: { high: number; medium: number; low: number };
+  by_domain: DomainStat[];
+  recent_runs: RecentRun[];
+};
+
+export async function getStats(): Promise<StatsData> {
+  const r = await fetch(`${getApiBase()}/stats`);
+  if (!r.ok) throw await httpError(r);
+  return r.json() as Promise<StatsData>;
+}
+
 export async function rerunFailed(runId: string): Promise<{ run_id: string; message: string }> {
   const r = await fetch(`${getApiBase()}/rerun-failed`, {
     method: "POST",
