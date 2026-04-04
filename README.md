@@ -6,7 +6,8 @@ Autonomous-ish end-to-end QA: **requirements → generated test cases → real b
 
 - **Dashboard:** Next.js 15 (`apps/web`)
 - **API:** FastAPI + SQLModel (SQLite) + Playwright (`apps/api`)
-- **Optional keys:** `OPENAI_API_KEY` for LLM test planning and validation; `BROWSER_USE_API_KEY` to run **Browser Use** agents (package is in `requirements.txt`) on top of Playwright snapshots
+- **Required key:** `OPENAI_API_KEY` for LLM test planning, validation, and Browser Use agent execution
+- **Packages:** `browser-use` + `langchain-openai` installed via `requirements.txt`
 
 ## Quick start
 
@@ -18,7 +19,7 @@ python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 playwright install chromium
-# Configure apps/api/.env (OPENAI_API_KEY optional; BROWSER_USE_API_KEY for agents)
+# Configure apps/api/.env  (set OPENAI_API_KEY to enable LLM planning, validation, and Browser Use agent)
 uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
@@ -58,7 +59,15 @@ Data lives in `data/qa_engineer.db`; screenshots under `artifacts/{run_id}/`.
 
 ## Browser Use
 
-**browser-use** is installed with `pip install -r requirements.txt`. Each case always gets a **Playwright** snapshot; when `BROWSER_USE_API_KEY` is set, a **Browser Use Agent** also runs for richer traces (see `apps/api/services/browser_runner.py`). Without that key, the agent path is skipped.
+**browser-use** and **langchain-openai** are installed via `pip install -r requirements.txt`. Each test case always gets a **Playwright** snapshot (screenshot + HTTP status). When `OPENAI_API_KEY` is set, a **Browser Use Agent** powered by `gpt-4o` also runs, following the generated test steps autonomously for richer traces (see `apps/api/services/browser_runner.py`). Without the key, the agent path is skipped and heuristic validation is used.
+
+## Video Recordings
+
+Every test case generates a `.webm` screen recording of the Playwright browser session. Recordings are saved at `artifacts/{run_id}/{case_id}/recording.webm` and served via the `/files/` static mount. The results UI embeds them inline.
+
+## Chat Interface
+
+Visit `http://localhost:3000/chat` to use the interactive mode: describe a test scenario in plain English, hit **Run**, and watch the Browser Use agent stream its actions back as a live chat log with embedded screenshots and video.
 
 ## Demo tip
 

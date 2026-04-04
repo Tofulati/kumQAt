@@ -24,7 +24,7 @@ def _task_prompt(case: TestCase, url: str) -> str:
 
 
 def _browser_use_available() -> bool:
-    if not os.getenv("BROWSER_USE_API_KEY"):
+    if not os.getenv("OPENAI_API_KEY"):
         return False
     try:
         import browser_use  # noqa: F401
@@ -35,13 +35,13 @@ def _browser_use_available() -> bool:
 
 
 async def _run_browser_use_agent(case: TestCase, url: str) -> str:
-    from browser_use import Agent, Browser, ChatBrowserUse
+    from browser_use import Agent
+    from langchain_openai import ChatOpenAI
 
-    browser = Browser()
+    llm = ChatOpenAI(model="gpt-4o", temperature=0.0)
     agent = Agent(
         task=_task_prompt(case, url),
-        llm=ChatBrowserUse(),
-        browser=browser,
+        llm=llm,
     )
     result = await agent.run()
     if result is None:
@@ -53,7 +53,8 @@ async def _run_playwright_smoke(
     url: str,
     viewport: str,
     shot_path: Path,
-) -> tuple[str, str, str, bool]:
+    video_dir: Path,
+) -> tuple[str, str, str, bool, str | None]:
     from playwright.async_api import async_playwright
 
     vw, vh = (1280, 720) if viewport == "desktop" else (390, 844)
@@ -61,11 +62,17 @@ async def _run_playwright_smoke(
     http_ok = True
     final_url = url
     title = ""
+    video_path_raw: str | None = None
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         try:
-            page = await browser.new_page(viewport={"width": vw, "height": vh})
+            context = await browser.new_context(
+                viewport={"width": vw, "height": vh},
+                record_video_dir=str(video_dir),
+                record_video_size={"width": vw, "height": vh},
+            )
+            page = await context.new_page()
             resp = await page.goto(url, wait_until="domcontentloaded", timeout=45000)
             if resp is not None:
                 http_ok = 200 <= resp.status < 400
@@ -77,13 +84,23 @@ async def _run_playwright_smoke(
             trace_parts.append(f"Final URL: {final_url}")
             await page.screenshot(path=str(shot_path), full_page=False)
             trace_parts.append(f"Screenshot saved: {shot_path.name}")
+            # Must retrieve video path BEFORE context.close() finalises the file
+            if page.video:
+                try:
+                    video_path_raw = await page.video.path()
+                except Exception:
+                    video_path_raw = None
         except Exception as e:
             http_ok = False
             trace_parts.append(f"Playwright error: {e!s}")
         finally:
+            try:
+                await context.close()  # finalises the .webm recording
+            except Exception:
+                pass
             await browser.close()
 
-    return "\n".join(trace_parts), title, final_url, http_ok
+    return "\n".join(trace_parts), title, final_url, http_ok, video_path_raw
 
 
 async def execute_case(
@@ -101,8 +118,21 @@ async def execute_case(
     evidence: list[str] = []
 
     shot = case_dir / "viewport.png"
-    pw_trace, title, final_url, http_ok = await _run_playwright_smoke(url, viewport, shot)
+    pw_trace, title, final_url, http_ok, video_path_raw = await _run_playwright_smoke(
+        url, viewport, shot, video_dir=case_dir
+    )
     evidence.append(f"/files/{run_id}/{case.id}/viewport.png")
+
+    # Rename Playwright's UUID-named video to a stable path and add to evidence
+    if video_path_raw:
+        try:
+            raw = Path(video_path_raw)
+            if raw.exists():
+                dest = case_dir / "recording.webm"
+                raw.rename(dest)
+                evidence.append(f"/files/{run_id}/{case.id}/recording.webm")
+        except Exception:
+            pass
 
     if _browser_use_available():
         try:
