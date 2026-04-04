@@ -1,5 +1,8 @@
 # QABot — Codebase Docs & DiamondHacks Battle Plan
 
+> **Status: All 5 PRs merged to main ✅**
+> PR 1 (browser-use fix + video) → PR 2 (SSE backend) → PR 3 (UI overhaul) → PR 4 (chat interface) → PR 5 (docs)
+
 ---
 
 ## 1. What This Project Is
@@ -27,11 +30,12 @@ apps/
 │   │   └── schemas.py     ← Pydantic request/response schemas (TestCase, TestResultPayload, etc.)
 │   ├── routers/
 │   │   ├── tests.py   ← POST /generate-tests
-│   │   └── runs.py    ← POST /run-suite, /run-test, /rerun-failed; GET /results/{id}, /runs, /export/{id}.json
+│   │   └── runs.py    ← POST /run-suite, /run-test, /chat-run, /rerun-failed; GET /results/{id}, /runs, /stream/{id}, /export/{id}.json
 │   ├── services/
-│   │   ├── planner.py      ← GPT-4o-mini → structured TestCase list (fallback: 5 hardcoded templates)
-│   │   ├── browser_runner.py ← Playwright smoke + Browser Use agent execution
-│   │   ├── orchestrator.py   ← Ties it all together: runs cases sequentially, writes results to DB
+│   │   ├── planner.py        ← GPT-4o-mini → structured TestCase list (fallback: 5 hardcoded templates)
+│   │   ├── browser_runner.py ← Playwright smoke+video + Browser Use agent (langchain_openai.ChatOpenAI)
+│   │   ├── orchestrator.py   ← Sequential execution loop; emits SSE events via event_bus
+│   │   ├── event_bus.py      ← [NEW] asyncio.Queue per run for SSE distribution
 │   │   ├── validator.py      ← GPT-4o-mini classifies pass/fail/flaky/blocked (fallback: heuristics)
 │   │   └── reporter.py       ← Builds human-readable summary string from TestResultPayload
 │   └── storage/
@@ -39,11 +43,14 @@ apps/
 │
 └── web/               ← Next.js 15 frontend
     ├── app/
-    │   ├── page.tsx           ← Main form: URL + requirement + viewport → generate/run
-    │   ├── runs/[runId]/page.tsx  ← Results page, polls every 2.5s
-    │   └── api/qa/[...path]/route.ts ← Next.js proxy → FastAPI (avoids CORS)
+    │   ├── page.tsx                    ← Main form: URL + requirement + viewport → generate/run
+    │   ├── chat/page.tsx               ← [NEW] Interactive chat interface with live SSE streaming
+    │   ├── runs/[runId]/page.tsx       ← Results page — SSE stream (polling removed)
+    │   ├── runs/[runId]/ResultCard.tsx ← [NEW] Per-case card: screenshot, video, repro steps
+    │   ├── runs/[runId]/SummaryBar.tsx ← [NEW] Pass/fail/blocked counts + progress bar
+    │   └── api/qa/[...path]/route.ts   ← Next.js proxy → FastAPI; forwards SSE headers
     └── lib/
-        └── api.ts    ← Typed fetch wrappers for all backend endpoints
+        └── api.ts    ← Typed fetch wrappers + TestResult/SseEvent types + streamRunEvents/chatRun
 ```
 
 ### Database Tables
@@ -117,7 +124,7 @@ Fixed: agent now uses `langchain_openai.ChatOpenAI(model="gpt-4o")` passed as `l
 It **never reads or executes the `case.steps` list** (e.g. "click Login button", "fill in email field"). The steps are only used in the Browser Use agent prompt. Without a working Browser Use, the system is doing smoke tests — not real QA.
 
 ### ⚠️ No Real-Time Streaming
-The UI polls every 2.5s. There's no live view of what the browser agent is doing. This is a major missed demo opportunity.
+~~The UI polled every 2.5s.~~ **Fixed in PR 3** — results page now subscribes to SSE; cards stream in as each case completes. Polling `setInterval` removed entirely.
 
 ---
 
