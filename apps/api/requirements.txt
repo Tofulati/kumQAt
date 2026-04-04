@@ -7,4 +7,5 @@ python-dotenv>=1.0.1
 pydantic>=2.9.0,<3
 playwright==1.49.1
 browser-use==0.12.6
+browser-use-sdk>=2.0.15
 langchain-google-genai>=2.0.0

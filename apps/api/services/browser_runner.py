@@ -23,7 +23,13 @@ def _task_prompt(case: TestCase, url: str) -> str:
     )
 
 
-def _browser_use_available() -> bool:
+def _cloud_browser_use_available() -> bool:
+    """Check if Browser Use Cloud API credentials are present."""
+    return bool((os.getenv("BROWSER_USE_API_KEY") or "").strip())
+
+
+def _local_browser_use_available() -> bool:
+    """Check if local browser-use package + Gemini key are present."""
     if not os.getenv("GOOGLE_API_KEY"):
         return False
     try:
@@ -34,7 +40,62 @@ def _browser_use_available() -> bool:
         return False
 
 
-async def _run_browser_use_agent(case: TestCase, url: str) -> str:
+def _browser_use_available() -> bool:
+    return _cloud_browser_use_available() or _local_browser_use_available()
+
+
+async def _run_browser_use_cloud_agent(case: TestCase, url: str) -> str:
+    """Execute via Browser Use Cloud API (uses $70 sponsored credits)."""
+    import asyncio
+
+    from browser_use_sdk import AsyncBrowserUse
+
+    key = (os.getenv("BROWSER_USE_API_KEY") or "").strip()
+    client = AsyncBrowserUse(api_key=key)
+
+    # Pick best available Gemini model via cloud (gemini-2.5-flash is fastest)
+    cloud_llm = os.getenv("BROWSER_USE_CLOUD_LLM", "gemini-2.5-flash")
+
+    created = await client.tasks.create_task(
+        task=_task_prompt(case, url),
+        start_url=url,
+        llm=cloud_llm,  # type: ignore[arg-type]
+        max_steps=20,
+    )
+    task_id = created.id
+
+    # Poll status until terminal (max ~5 min at 2 s intervals)
+    for _ in range(150):
+        status_view = await client.tasks.get_task_status(task_id)
+        if status_view.status in ("finished", "stopped"):
+            break
+        await asyncio.sleep(2)
+
+    # Fetch full task details including step-by-step trace
+    task_view = await client.tasks.get_task(task_id)
+
+    parts: list[str] = [f"Browser Use Cloud task {task_id} | status: {task_view.status}"]
+    for step in task_view.steps or []:
+        parts.append(f"\nStep {step.number}: {step.next_goal}")
+        if step.evaluation_previous_goal:
+            parts.append(f"  ↳ eval: {step.evaluation_previous_goal}")
+        if step.memory:
+            parts.append(f"  ↳ memory: {step.memory[:200]}")
+
+    if task_view.output:
+        parts.append(f"\nFinal output: {task_view.output}")
+
+    if task_view.is_success is not None:
+        parts.append(f"Agent self-reported success: {task_view.is_success}")
+
+    if task_view.judge_verdict:
+        parts.append(f"Judge verdict: {task_view.judge_verdict}")
+
+    return "\n".join(parts)
+
+
+async def _run_browser_use_local_agent(case: TestCase, url: str) -> str:
+    """Fallback: execute via local browser-use package with Gemini LLM."""
     from browser_use import Agent
     from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -51,6 +112,13 @@ async def _run_browser_use_agent(case: TestCase, url: str) -> str:
     if result is None:
         return "Agent completed with no return payload."
     return str(result)
+
+
+async def _run_browser_use_agent(case: TestCase, url: str) -> str:
+    """Dispatch to cloud API if available, otherwise fall back to local agent."""
+    if _cloud_browser_use_available():
+        return await _run_browser_use_cloud_agent(case, url)
+    return await _run_browser_use_local_agent(case, url)
 
 
 async def _run_playwright_smoke(
