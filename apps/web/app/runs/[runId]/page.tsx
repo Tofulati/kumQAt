@@ -45,7 +45,23 @@ export default function RunPage() {
       if (event.type === "run_started") {
         setTotalCases((event.data.total as number) ?? 0);
       } else if (event.type === "case_completed") {
-        setLiveResults((prev) => [...prev, event.data as unknown as TestResult]);
+        const d = event.data;
+        const partial: TestResult = {
+          test_case_id: (d.case_id as string) ?? "",
+          status: (d.status as TestResult["status"]) ?? "fail",
+          severity: (d.severity as TestResult["severity"]) ?? "medium",
+          confidence: typeof d.confidence === "number" ? d.confidence : 0.5,
+          failed_step: (d.failed_step as string | null) ?? null,
+          expected: (d.expected as string) ?? "",
+          actual: (d.actual as string) ?? "",
+          repro_steps: Array.isArray(d.repro_steps) ? (d.repro_steps as string[]) : [],
+          evidence: Array.isArray(d.evidence) ? (d.evidence as string[]) : [],
+          suspected_issue: (d.suspected_issue as string) ?? "",
+          business_impact: (d.business_impact as string) ?? "",
+          agent_trace: (d.agent_trace as string) ?? "",
+          summary: (d.summary as string) ?? "",
+        };
+        setLiveResults((prev) => [...prev, partial]);
       } else if (event.type === "run_completed") {
         setStreamDone(true);
         // Re-fetch final DB state to get complete result payloads

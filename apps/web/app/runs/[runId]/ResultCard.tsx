@@ -33,8 +33,10 @@ export default function ResultCard({ result, testCase }: Props) {
   const statusStyle = STATUS_STYLES[result.status] ?? "bg-zinc-800 text-zinc-300 border-zinc-700";
   const sevStyle = SEVERITY_STYLES[result.severity] ?? SEVERITY_STYLES.medium;
 
-  const pngEvidence = result.evidence.filter((e) => e.endsWith(".png"));
-  const videoEvidence = result.evidence.filter((e) => e.endsWith(".webm"));
+  const evidence = result.evidence ?? [];
+  const reproSteps = result.repro_steps ?? [];
+  const pngEvidence = evidence.filter((e) => e.endsWith(".png"));
+  const videoEvidence = evidence.filter((e) => e.endsWith(".webm"));
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 shadow-sm">
@@ -108,11 +110,11 @@ export default function ResultCard({ result, testCase }: Props) {
           )}
 
           {/* Repro steps */}
-          {result.repro_steps.length > 0 && (
+          {reproSteps.length > 0 && (
             <div>
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Repro steps</p>
               <ol className="list-decimal list-inside space-y-1">
-                {result.repro_steps.map((s, i) => (
+                {reproSteps.map((s, i) => (
                   <li key={i} className="text-sm text-zinc-400">{s}</li>
                 ))}
               </ol>
