@@ -10,5 +10,8 @@
     "dev:api": "cd apps/api && .venv/bin/uvicorn main:app --reload --host 127.0.0.1 --port 8000",
     "build": "npm run build --workspace=web",
     "lint": "npm run lint --workspace=web"
+  },
+  "dependencies": {
+    "next": "^15.5.14"
   }
 }
