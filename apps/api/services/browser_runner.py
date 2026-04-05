@@ -61,8 +61,6 @@ async def _run_browser_use_cloud_agent(
     Creates a session first to get a live_url, emits it via SSE immediately.
     Uses highlight_elements=True so agent screenshots show element highlights.
     """
-    import asyncio
-
     from browser_use_sdk import AsyncBrowserUse
     from services.event_bus import emit as _emit
 
@@ -95,14 +93,11 @@ async def _run_browser_use_cloud_agent(
     )
     task_id = created.id
 
-    # Poll until terminal (max ~5 min at 2 s intervals)
-    for _ in range(150):
-        status_view = await client.tasks.get_task_status(task_id)
-        if status_view.status in ("finished", "stopped"):
-            break
-        await asyncio.sleep(2)
-
-    task_view = await client.tasks.get_task(task_id)
+    # SDK v2: lightweight polling is tasks.status(); wait() wraps that (300s, 2s interval).
+    try:
+        task_view = await client.tasks.wait(task_id, timeout=300.0, interval=2.0)
+    except TimeoutError:
+        task_view = await client.tasks.get_task(task_id)
 
     # Build trace and collect per-step screenshot URLs
     parts: list[str] = [f"Browser Use Cloud task {task_id} | status: {task_view.status}"]
