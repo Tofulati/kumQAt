@@ -12,6 +12,6 @@
     "lint": "npm run lint --workspace=web"
   },
   "dependencies": {
-    "next": "^15.5.14"
+    "next": "^16.2.2"
   }
 }
