@@ -118,6 +118,29 @@ const FAQ_ITEMS = [
     ),
   },
   {
+    q: "What do P0 / P1 / P2 test priorities mean?",
+    a: (
+      <ul className="list-none space-y-1 text-sm text-zinc-400">
+        <li>
+          <span className="font-medium text-red-400">P0:</span> Critical user
+          flow; usually release-blocking if it fails.
+        </li>
+        <li>
+          <span className="font-medium text-amber-300">P1:</span> Important
+          functionality; high impact but typically not full release blockers.
+        </li>
+        <li>
+          <span className="font-medium text-zinc-400">P2:</span> Lower-priority
+          coverage, edge cases, or polish checks.
+        </li>
+        <li>
+          In the current version, these priorities are shown as triage labels in
+          the UI and do not automatically change execution order.
+        </li>
+      </ul>
+    ),
+  },
+  {
     q: "What does the agent actually do?",
     a: (
       <p className="text-sm text-zinc-400">
