@@ -25,11 +25,6 @@ const STATUS_TEXT: Record<string, string> = {
   blocked: "text-amber-300", flaky: "text-sky-300",
 };
 
-const STATUS_BG: Record<string, string> = {
-  pass: "bg-emerald-500", fail: "bg-red-500",
-  blocked: "bg-amber-500", flaky: "bg-sky-400",
-};
-
 const SEV_COLOR = { high: "#ef4444", medium: "#f59e0b", low: "#71717a" };
 const SEV_TEXT  = { high: "text-red-400", medium: "text-amber-300", low: "text-zinc-400" };
 

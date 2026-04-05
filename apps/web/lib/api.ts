@@ -290,7 +290,11 @@ export function streamRunEvents(
   onEvent: (e: SseEvent) => void,
   onClose: () => void,
 ): () => void {
-  const source = new EventSource(`/api/qa/stream/${runId}`);
+  // Optional: connect straight to FastAPI so live runs are not limited by Vercel
+  // serverless duration (set in Vercel: NEXT_PUBLIC_DIRECT_API_ORIGIN=https://api.yourhost.com).
+  const direct = (process.env.NEXT_PUBLIC_DIRECT_API_ORIGIN || "").trim().replace(/\/$/, "");
+  const streamUrl = direct ? `${direct}/stream/${runId}` : `/api/qa/stream/${runId}`;
+  const source = new EventSource(streamUrl);
   source.onmessage = (e) => {
     try {
       const event = JSON.parse(e.data as string) as SseEvent;

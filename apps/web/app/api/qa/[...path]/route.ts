@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
+/** Pro/Enterprise: raise if runs stream longer than default (Hobby has a low cap). */
+export const maxDuration = 300;
 
 function backendBase(): string {
   return (process.env.QA_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");

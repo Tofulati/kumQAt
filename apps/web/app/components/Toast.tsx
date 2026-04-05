@@ -21,7 +21,6 @@ type ToastItem = {
 
 type Listener = (item: Omit<ToastItem, "id">) => void;
 const _listeners = new Set<Listener>();
-let _seq = 0;
 
 export function showToast(message: string, kind: ToastKind = "info") {
   _listeners.forEach((l) => l({ kind, message }));
