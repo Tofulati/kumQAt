@@ -88,6 +88,19 @@ class ChatRunRequest(BaseModel):
     viewport: Literal["desktop", "mobile"] = "desktop"
 
 
+class ScheduleRunRequest(BaseModel):
+    url: str
+    requirement_text: str
+    viewport: Literal["desktop", "mobile"] = "desktop"
+    interval: Literal["hourly", "daily", "weekly"] = "daily"
+
+
+class ScheduleRunResponse(BaseModel):
+    schedule_id: str
+    message: str
+    next_run_at: str
+
+
 class DiscussMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str

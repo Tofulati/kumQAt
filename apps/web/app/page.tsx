@@ -170,7 +170,7 @@ export default function AboutPage() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_55%_at_50%_-5%,rgba(124,58,237,0.22),transparent)]" />
 
         <p className="relative mb-5 text-xs font-semibold uppercase tracking-[0.25em] text-violet-400">
-          DiamondHacks 2026 · Browser Use + Gemini
+          DiamondHacks 2026 · Kumqat
         </p>
 
         <h1 className="relative max-w-3xl text-5xl font-extrabold leading-tight tracking-tight sm:text-6xl">
@@ -180,7 +180,7 @@ export default function AboutPage() {
         </h1>
 
         <p className="relative mt-6 max-w-xl text-base text-zinc-400">
-          Describe what to test in plain English. QABot generates AI-written
+          Describe what to test in plain English. Kumqat generates AI-written
           test cases, runs them in a real browser with the Browser Use Cloud
           agent, and delivers structured bug reports automatically.
         </p>
@@ -222,13 +222,13 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── Why QABot ─────────────────────────────────────────────────── */}
+      {/* ── Why Kumqat ─────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-y border-zinc-800/60 bg-zinc-950/60 py-20 text-center">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_60%_at_50%_50%,rgba(124,58,237,0.08),transparent)]" />
 
         <h2 className="relative text-3xl font-bold sm:text-4xl">
           <span className="bg-gradient-to-r from-amber-400 via-violet-400 to-purple-500 bg-clip-text text-transparent">
-            Why Choose QABot?
+            Why Choose Kumqat?
           </span>
         </h2>
 
@@ -246,7 +246,7 @@ export default function AboutPage() {
         </div>
 
         <p className="relative mx-auto mt-10 max-w-2xl px-4 text-sm text-zinc-400">
-          QABot is an AI-powered browser QA platform that turns product
+          Kumqat is an AI-powered browser QA platform that turns product
           requirements into executable browser test cases, runs them against your
           live site with a real browser agent, and delivers structured, actionable
           bug reports in minutes.

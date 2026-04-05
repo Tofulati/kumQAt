@@ -173,6 +173,52 @@ export type StatsData = {
   recent_runs: RecentRun[];
 };
 
+// ---------------------------------------------------------------------------
+// Scheduled runs
+// ---------------------------------------------------------------------------
+
+export type ScheduleInterval = "hourly" | "daily" | "weekly";
+
+export type Schedule = {
+  id: string;
+  url: string;
+  requirement_text: string;
+  viewport: string;
+  interval: ScheduleInterval;
+  next_run_at: string;
+  created_at: string;
+  last_run_id: string | null;
+  active: boolean;
+};
+
+export async function createSchedule(body: {
+  url: string;
+  requirement_text: string;
+  viewport: "desktop" | "mobile";
+  interval: ScheduleInterval;
+}): Promise<{ schedule_id: string; message: string; next_run_at: string }> {
+  const r = await fetch(`${getApiBase()}/schedule-run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw await httpError(r);
+  return r.json() as Promise<{ schedule_id: string; message: string; next_run_at: string }>;
+}
+
+export async function listSchedules(): Promise<Schedule[]> {
+  const r = await fetch(`${getApiBase()}/scheduled-runs`);
+  if (!r.ok) throw await httpError(r);
+  return r.json() as Promise<Schedule[]>;
+}
+
+export async function deleteSchedule(scheduleId: string): Promise<void> {
+  const r = await fetch(`${getApiBase()}/scheduled-runs/${scheduleId}`, {
+    method: "DELETE",
+  });
+  if (!r.ok) throw await httpError(r);
+}
+
 export async function getStats(): Promise<StatsData> {
   const r = await fetch(`${getApiBase()}/stats`);
   if (!r.ok) throw await httpError(r);

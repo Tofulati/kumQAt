@@ -9,7 +9,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "QABot — AI QA Engineer",
+  title: "Kumqat — AI Browser QA",
   description: "Requirements-driven browser QA with structured bug reports powered by Browser Use and Gemini",
 };
 

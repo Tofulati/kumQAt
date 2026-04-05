@@ -30,7 +30,7 @@ export default function ConfigCheck() {
       .catch(() => {
         // Backend not reachable — surface a clear error instead of silent failure
         showToast(
-          "Cannot reach the QABot API. Make sure uvicorn is running on port 8000.",
+          "Cannot reach the Kumqat API. Make sure uvicorn is running on port 8000.",
           "error",
         );
       });

@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlmodel import Session, select
 
 from database import get_session
-from models.db_models import Run, StoredTestCase, TestResultRow
+from models.db_models import Run, ScheduledRun, StoredTestCase, TestResultRow
 from models.schemas import (
     ChatRunRequest,
     DiscussRequest,
@@ -17,6 +17,8 @@ from models.schemas import (
     RunResultsResponse,
     RunSuiteRequest,
     RunSuiteResponse,
+    ScheduleRunRequest,
+    ScheduleRunResponse,
     TestCase,
 )
 from services.event_bus import close_queue, create_queue, get_or_create_queue
@@ -502,6 +504,70 @@ async def discuss_run(body: DiscussRequest, session: Session = Depends(get_sessi
         raise HTTPException(status_code=502, detail=f"Gemini error: {e!s}") from e
 
     return {"reply": reply}
+
+
+@router.post("/schedule-run", response_model=ScheduleRunResponse)
+async def schedule_run(
+    body: ScheduleRunRequest,
+    session: Session = Depends(get_session),
+):
+    """Create a recurring scheduled test run."""
+    from datetime import timedelta
+
+    url = _normalize_url(body.url)
+    schedule_id = str(uuid.uuid4())
+    delta = {"hourly": timedelta(hours=1), "daily": timedelta(days=1), "weekly": timedelta(weeks=1)}.get(
+        body.interval, timedelta(days=1)
+    )
+    now = datetime.utcnow()
+    sched = ScheduledRun(
+        id=schedule_id,
+        url=url,
+        requirement_text=body.requirement_text,
+        viewport=body.viewport,
+        interval=body.interval,
+        next_run_at=now + delta,
+        created_at=now,
+    )
+    session.add(sched)
+    session.commit()
+    return ScheduleRunResponse(
+        schedule_id=schedule_id,
+        message=f"Scheduled {body.interval} run for {url}.",
+        next_run_at=sched.next_run_at.isoformat(),
+    )
+
+
+@router.get("/scheduled-runs")
+def list_scheduled_runs(session: Session = Depends(get_session)):
+    """List all scheduled runs, newest first."""
+    schedules = session.exec(
+        select(ScheduledRun).order_by(ScheduledRun.created_at)
+    ).all()
+    return [
+        {
+            "id": s.id,
+            "url": s.url,
+            "requirement_text": s.requirement_text,
+            "viewport": s.viewport,
+            "interval": s.interval,
+            "next_run_at": s.next_run_at.isoformat(),
+            "created_at": s.created_at.isoformat(),
+            "last_run_id": s.last_run_id,
+            "active": s.active,
+        }
+        for s in schedules
+    ]
+
+
+@router.delete("/scheduled-runs/{schedule_id}")
+def delete_scheduled_run(schedule_id: str, session: Session = Depends(get_session)):
+    sched = session.get(ScheduledRun, schedule_id)
+    if not sched:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    session.delete(sched)
+    session.commit()
+    return {"message": "Schedule deleted"}
 
 
 @router.get("/export/{run_id}.json")

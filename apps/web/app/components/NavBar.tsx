@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FlaskConical, MessageSquare, Info, PlusCircle, ListChecks, LayoutDashboard } from "lucide-react";
+import { FlaskConical, MessageSquare, Info, PlusCircle, ListChecks, LayoutDashboard, Clock } from "lucide-react";
 
 const links = [
   { href: "/",           label: "About",     icon: Info },
   { href: "/new-run",    label: "New Run",   icon: PlusCircle },
+  { href: "/scheduled",  label: "Scheduled", icon: Clock },
   { href: "/dashboard",  label: "Dashboard", icon: LayoutDashboard },
   { href: "/runs",       label: "Results",   icon: ListChecks },
   { href: "/chat",       label: "Chat",      icon: MessageSquare },
@@ -26,7 +27,7 @@ export default function NavBar() {
             <FlaskConical size={14} className="text-white" />
           </div>
           <span className="bg-gradient-to-r from-amber-400 to-violet-400 bg-clip-text text-transparent">
-            QABot
+            Kumqat
           </span>
         </Link>
 
@@ -54,7 +55,7 @@ export default function NavBar() {
         </div>
 
         <span className="ml-auto hidden text-xs text-zinc-600 sm:block">
-          DiamondHacks 2026
+          DiamondHacks 2026 · Kumqat
         </span>
       </div>
     </nav>
